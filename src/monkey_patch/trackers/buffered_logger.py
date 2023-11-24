@@ -2,6 +2,7 @@ import json
 import os
 
 from appdirs import user_data_dir
+from pydantic import BaseModel
 
 from monkey_patch.bloom_filter import BloomFilter, optimal_bloom_filter_params
 from monkey_patch.trackers.dataset_worker import DatasetWorker
@@ -13,6 +14,12 @@ EXPECTED_ITEMS = 10000
 FALSE_POSITIVE_RATE = 0.01
 LIB_NAME = "monkey-patch"
 ENVVAR = "MONKEY_PATCH_LOG_DIR"
+
+# -- Dataset Length --  
+
+class Dataset(BaseModel):
+    alignments: str
+    patches: str
 
 class BufferedLogger(DatasetWorker):
     def __init__(self, name, level=15):
@@ -115,7 +122,10 @@ class BufferedLogger(DatasetWorker):
             # discard all .json files
             files = [x for x in files if ".json" not in x]
         except Exception as e:
-            return dataset_lengths
+            try:
+                return Dataset(**dataset_lengths)
+            except Exception as err:
+                print(err.errors())
         
         for file in files:
             if ALIGN_FILE_EXTENSION not in file and PATCH_FILE_EXTENSION not in file:
@@ -126,7 +136,10 @@ class BufferedLogger(DatasetWorker):
                 dataset_type = "patches"
             func_hash = file.replace(ALIGN_FILE_EXTENSION, "").replace(PATCH_FILE_EXTENSION, "")
             dataset_lengths[dataset_type][func_hash] =  -1
-        return dataset_lengths
+        try:
+            return Dataset(**dataset_lengths)
+        except Exception as err:
+            print(err.errors())
 
 
     def log_align(self, func_hash, *args, **kws):
